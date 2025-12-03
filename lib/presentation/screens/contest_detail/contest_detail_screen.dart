@@ -1,11 +1,14 @@
+import 'dart:io';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:humble_photo_contest/data/models/contest.dart';
-import 'package:humble_photo_contest/data/models/google_media_item.dart';
+import 'package:humble_photo_contest/data/models/photo.dart';
 import 'package:humble_photo_contest/presentation/providers/auth_provider.dart';
-import 'package:humble_photo_contest/presentation/providers/google_photos_provider.dart';
+import 'package:humble_photo_contest/presentation/providers/photo_provider.dart';
 import 'package:humble_photo_contest/presentation/providers/vote_provider.dart';
+import 'package:image_picker/image_picker.dart';
 
 class ContestDetailScreen extends ConsumerStatefulWidget {
   final Contest contest;
@@ -18,20 +21,28 @@ class ContestDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _ContestDetailScreenState extends ConsumerState<ContestDetailScreen> {
-  late Future<List<GoogleMediaItem>> _photosFuture;
-  Set<String> _votedMediaItemIds = {};
+  late Future<List<Photo>> _photosFuture;
+  Set<String> _votedPhotoIds = {};
   Map<String, int> _voteCounts = {};
+  final ImagePicker _picker = ImagePicker();
+  bool _isUploading = false;
 
   @override
   void initState() {
     super.initState();
-    _photosFuture = ref
-        .read(googlePhotosServiceProvider)
-        .getMediaItems(widget.contest.googleAlbumId);
+    _refreshPhotos();
     _fetchMyVotes();
     if (widget.contest.showVoteCounts) {
       _fetchVoteCounts();
     }
+  }
+
+  void _refreshPhotos() {
+    setState(() {
+      _photosFuture = ref
+          .read(photoRepositoryProvider)
+          .getPhotos(widget.contest.id);
+    });
   }
 
   Future<void> _fetchMyVotes() async {
@@ -42,7 +53,7 @@ class _ContestDetailScreenState extends ConsumerState<ContestDetailScreen> {
           .getMyVotes(user.id, widget.contest.id);
       if (mounted) {
         setState(() {
-          _votedMediaItemIds = votes;
+          _votedPhotoIds = votes;
         });
       }
     }
@@ -59,11 +70,77 @@ class _ContestDetailScreenState extends ConsumerState<ContestDetailScreen> {
     }
   }
 
+  Future<void> _pickAndUploadPhoto() async {
+    try {
+      final user = ref.read(currentUserProvider);
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please login to upload photos')),
+        );
+        return;
+      }
+
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1920,
+        maxHeight: 1920,
+        imageQuality: 85,
+      );
+
+      if (image == null) return;
+
+      setState(() {
+        _isUploading = true;
+      });
+
+      await ref
+          .read(photoRepositoryProvider)
+          .uploadPhoto(
+            contestId: widget.contest.id,
+            userId: user.id,
+            file: File(image.path),
+          );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Photo uploaded successfully!')),
+        );
+        _refreshPhotos();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to upload photo: $e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploading = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(widget.contest.title)),
-      body: FutureBuilder<List<GoogleMediaItem>>(
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _isUploading ? null : _pickAndUploadPhoto,
+        icon: _isUploading
+            ? const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
+              )
+            : const Icon(Icons.add_a_photo),
+        label: Text(_isUploading ? 'Uploading...' : 'Submit Photo'),
+      ),
+      body: FutureBuilder<List<Photo>>(
         future: _photosFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -74,7 +151,20 @@ class _ContestDetailScreenState extends ConsumerState<ContestDetailScreen> {
           }
           final photos = snapshot.data ?? [];
           if (photos.isEmpty) {
-            return const Center(child: Text('No photos found in this album.'));
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.photo_library_outlined,
+                    size: 64,
+                    color: Colors.grey,
+                  ),
+                  SizedBox(height: 16),
+                  Text('No photos yet. Be the first to submit!'),
+                ],
+              ),
+            );
           }
 
           return GridView.builder(
@@ -87,14 +177,17 @@ class _ContestDetailScreenState extends ConsumerState<ContestDetailScreen> {
             itemCount: photos.length,
             itemBuilder: (context, index) {
               final photo = photos[index];
-              final isVoted = _votedMediaItemIds.contains(photo.id);
+              final isVoted = _votedPhotoIds.contains(photo.id);
               final voteCount = _voteCounts[photo.id] ?? 0;
+              final photoUrl = ref
+                  .read(photoRepositoryProvider)
+                  .getPhotoUrl(photo.storagePath);
 
               return Stack(
                 fit: StackFit.expand,
                 children: [
                   CachedNetworkImage(
-                    imageUrl: '${photo.baseUrl}=w500-h500-c',
+                    imageUrl: photoUrl,
                     fit: BoxFit.cover,
                     placeholder: (context, url) =>
                         Container(color: Colors.grey[300]),
@@ -171,16 +264,11 @@ class _ContestDetailScreenState extends ConsumerState<ContestDetailScreen> {
                                   .castVote(
                                     userId: user.id,
                                     contestId: widget.contest.id,
-                                    googleMediaItemId: photo.id,
-                                    metaData: {
-                                      'filename': photo.filename,
-                                      'mimeType': photo.mimeType,
-                                      'baseUrl': photo.baseUrl,
-                                    },
+                                    photoId: photo.id,
                                   );
 
                               setState(() {
-                                _votedMediaItemIds.add(photo.id);
+                                _votedPhotoIds.add(photo.id);
                                 if (widget.contest.showVoteCounts) {
                                   _voteCounts[photo.id] =
                                       (_voteCounts[photo.id] ?? 0) + 1;

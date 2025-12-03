@@ -8,16 +8,16 @@ class ContestRepository {
 
   Future<Contest> createContest({
     required String hostUserId,
-    required String googleAlbumId,
     required String title,
+    String? description,
     required bool showVoteCounts,
   }) async {
     final response = await _supabase
         .from('contests')
         .insert({
           'host_user_id': hostUserId,
-          'google_album_id': googleAlbumId,
           'title': title,
+          'description': description,
           'status': 'draft', // Default to draft
           'voting_type': 'like', // Default to like
           'show_vote_counts': showVoteCounts,
