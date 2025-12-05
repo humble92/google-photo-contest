@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -146,12 +147,17 @@ class _CreateContestScreenState extends ConsumerState<CreateContestScreen> {
             const SizedBox(height: 16),
             TextFormField(
               controller: _linkController,
-              decoration: const InputDecoration(
+              enabled: !kIsWeb,
+              decoration: InputDecoration(
                 labelText: 'Import from Google Photos Link (Optional)',
-                hintText: 'https://photos.app.goo.gl/...',
-                border: OutlineInputBorder(),
-                helperText:
-                    'Paste a shared album link to automatically import photos.',
+                hintText: kIsWeb
+                    ? 'Not available on web'
+                    : 'https://photos.app.goo.gl/...',
+                border: const OutlineInputBorder(),
+                helperText: kIsWeb
+                    ? 'Link import is only available on mobile due to browser security restrictions.'
+                    : 'Paste a shared album link to automatically import photos.',
+                helperMaxLines: 2,
               ),
             ),
             const SizedBox(height: 16),

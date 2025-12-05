@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 
 import 'package:flutter_image_compress/flutter_image_compress.dart';
@@ -37,6 +38,27 @@ class PhotoRepository {
         .upload(
           storagePath,
           file,
+          fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
+        );
+
+    // 2. Create DB Record
+    return _createPhotoRecord(contestId, userId, storagePath);
+  }
+
+  Future<Photo> uploadPhotoFromBytes({
+    required String contestId,
+    required String userId,
+    required Uint8List bytes,
+    required String fileName,
+  }) async {
+    final storagePath = '$contestId/$fileName';
+
+    // 1. Upload to Storage (using uploadBinary for web compatibility)
+    await _supabase.storage
+        .from('contest_photos')
+        .uploadBinary(
+          storagePath,
+          bytes,
           fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
         );
 

@@ -1,4 +1,4 @@
-import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as parser;
 
@@ -9,75 +9,112 @@ class LinkScraperService {
   /// the media items. This is a reverse-engineered approach and may break if
   /// Google changes their frontend structure.
   Future<List<String>> scrapePhotos(String url) async {
-    final response = await http.get(Uri.parse(url));
+    debugPrint('LinkScraper: Fetching URL: $url');
+
+    // Follow redirects for shortened URLs
+    final response = await http.get(
+      Uri.parse(url),
+      headers: {
+        'User-Agent':
+            'Mozilla/5.0 (Linux; Android 10; Pixel 4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36',
+      },
+    );
 
     if (response.statusCode != 200) {
       throw Exception('Failed to fetch URL: ${response.statusCode}');
     }
 
+    debugPrint(
+      'LinkScraper: Response received (${response.body.length} bytes), parsing HTML...',
+    );
+
+    // Log a sample of the response for debugging
+    if (kDebugMode) {
+      final sample = response.body.length > 500
+          ? response.body.substring(0, 500)
+          : response.body;
+      debugPrint('LinkScraper: HTML sample: $sample');
+    }
+
     final document = parser.parse(response.body);
 
-    // The data is usually embedded in a script tag with a specific callback.
-    // We look for "AF_initDataCallback" which contains the initial data.
-    // There are multiple callbacks, we need the one with the key 'ds:0' or similar
-    // that contains the media items.
+    // Try multiple approaches to find image URLs
 
-    // Heuristic: The script usually starts with "AF_initDataCallback".
-    // We regex for the JSON content.
-
+    // Approach 1: Look for script tags with AF_initDataCallback
     final scriptTags = document.getElementsByTagName('script');
-    String? dataScript;
+    debugPrint('LinkScraper: Found ${scriptTags.length} script tags');
 
-    for (final script in scriptTags) {
-      if (script.text.contains('AF_initDataCallback') &&
-          script.text.contains('ds:0')) {
-        // ds:0 often contains the main album data
-        dataScript = script.text;
-        break;
-      }
-    }
+    // Approach 2: Try to find ANY googleusercontent.com URLs in the entire page
+    final allUrls = <String>{};
+    final urlPattern = RegExp(
+      r'https://lh3\.googleusercontent\.com/[^\s"<>\\]+',
+      multiLine: true,
+    );
 
-    if (dataScript == null) {
-      // Fallback: Try to find any script with a large array of URLs
-      // Or maybe the key changed.
-      throw Exception('Could not find photo data in the page.');
-    }
+    // Search in the entire response body
+    final matches = urlPattern.allMatches(response.body);
+    debugPrint(
+      'LinkScraper: Found ${matches.length} total URL matches in HTML',
+    );
 
-    // Extract the JSON part
-    // Format: AF_initDataCallback({key: 'ds:0', hash: '...', data: [...] ...});
-    // We want the 'data' array.
+    for (final match in matches) {
+      var url = match.group(0)!;
+      // Clean up the URL
+      url = url.split('\\').first.split('"').first.split("'").first;
 
-    // Regex to capture the data array: data: (.*), sideChannel:
-    final regex = RegExp(r'data: (.*), sideChannel:');
-    final match = regex.firstMatch(dataScript);
-
-    if (match == null || match.groupCount < 1) {
-      throw Exception('Could not parse JSON data.');
-    }
-
-    final jsonString = match.group(1)!;
-
-    try {
-      final List<dynamic> data = json.decode(jsonString);
-
-      // The structure is deeply nested.
-      // data[1] is usually the list of media items.
-      final List<dynamic> mediaItems = data[1];
-
-      final List<String> imageUrls = [];
-
-      for (final item in mediaItems) {
-        // item[1][0] is usually the URL
-        // item[0] is the ID
-        if (item is List && item.length > 1) {
-          final url = item[1][0] as String;
-          imageUrls.add(url);
+      // Filter out thumbnails and small images
+      if (url.contains('=')) {
+        // Skip small thumbnails
+        if (url.contains('=s64') ||
+            url.contains('=s96') ||
+            url.contains('=s128') ||
+            url.contains('=s48')) {
+          continue;
         }
+        allUrls.add(url);
+      }
+    }
+
+    debugPrint(
+      'LinkScraper: Found ${allUrls.length} potential image URLs after filtering',
+    );
+
+    // Approach 3: Look for meta tags with og:image
+    final metaTags = document.getElementsByTagName('meta');
+    for (final meta in metaTags) {
+      final property = meta.attributes['property'];
+      final content = meta.attributes['content'];
+      if (property == 'og:image' &&
+          content != null &&
+          content.contains('googleusercontent')) {
+        debugPrint('LinkScraper: Found og:image: $content');
+        allUrls.add(content);
+      }
+    }
+
+    if (allUrls.isEmpty) {
+      // Last resort: check if this is actually a valid Google Photos link
+      if (!url.contains('photos.google.com') &&
+          !url.contains('photos.app.goo.gl')) {
+        throw Exception(
+          'Invalid Google Photos link. '
+          'Please use a link from photos.google.com or photos.app.goo.gl',
+        );
       }
 
-      return imageUrls;
-    } catch (e) {
-      throw Exception('Failed to parse internal JSON structure: $e');
+      throw Exception(
+        'Could not find any photos in the page. This may happen if:\n'
+        '1. The album link is not set to public/shared\n'
+        '2. The album is empty\n'
+        '3. Google has changed their page structure\n\n'
+        'Please ensure you:\n'
+        '1. Created a shared link in Google Photos\n'
+        '2. Set sharing to "Anyone with the link"\n'
+        '3. The album contains photos',
+      );
     }
+
+    debugPrint('LinkScraper: Returning ${allUrls.length} image URLs');
+    return allUrls.toList();
   }
 }

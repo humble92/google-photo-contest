@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -93,12 +91,17 @@ class _ContestDetailScreenState extends ConsumerState<ContestDetailScreen> {
         _isUploading = true;
       });
 
+      // Read image as bytes (works on both web and mobile)
+      final bytes = await image.readAsBytes();
+      final fileName = '${DateTime.now().toIso8601String()}_${user.id}.jpg';
+
       await ref
           .read(photoRepositoryProvider)
-          .uploadPhoto(
+          .uploadPhotoFromBytes(
             contestId: widget.contest.id,
             userId: user.id,
-            file: File(image.path),
+            bytes: bytes,
+            fileName: fileName,
           );
 
       if (mounted) {
