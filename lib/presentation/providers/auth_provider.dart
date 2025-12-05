@@ -29,18 +29,9 @@ final googleSignInProvider = Provider<GoogleSignIn>((ref) {
     clientId = EnvConstants.googleIosClientId;
   }
 
-  // IMPORTANT: On Web, including photo scopes prevents ID token from being returned
-  // by Google Identity Services (GIS). So we only include basic scopes for Web.
-  // On Android/iOS, we can include all scopes upfront.
-  final List<String> baseScopes = ['email', 'openid'];
-  final List<String> photoScopes = [
-    'https://www.googleapis.com/auth/photoslibrary.readonly',
-    'https://www.googleapis.com/auth/photoslibrary',
-  ];
-
-  // For Web: only basic scopes to ensure ID token is returned
-  // For mobile: include photo scopes upfront
-  final List<String> scopes = kIsWeb ? baseScopes : [...baseScopes, ...photoScopes];
+  // We no longer need Google Photos scopes as we are using Supabase Storage.
+  // We only need basic auth scopes.
+  final List<String> scopes = ['email', 'openid'];
 
   return GoogleSignIn(
     clientId: clientId,

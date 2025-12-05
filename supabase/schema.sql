@@ -36,7 +36,6 @@ CREATE TABLE public.subscription_history (
 CREATE TABLE public.contests (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     host_user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-    google_album_id TEXT NOT NULL,
     title TEXT NOT NULL,
     description TEXT,
     status contest_status DEFAULT 'draft',
@@ -53,7 +52,8 @@ CREATE TABLE public.contests (
 CREATE TABLE public.photos (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     contest_id UUID NOT NULL REFERENCES public.contests(id) ON DELETE CASCADE,
-    google_media_item_id TEXT NOT NULL,
+    user_id uuid not null references auth.users (id) on delete cascade,
+    storage_path text not null,
     meta_data JSONB, -- Store width, height, creationTime, etc.
     vote_count INTEGER DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -74,6 +74,31 @@ CREATE TABLE public.votes (
 
 -- 7. Functions & Triggers
 
+-- Function to handle new user creation from auth.users
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.users (id, email, display_name, avatar_url, provider_id)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name'),
+    NEW.raw_user_meta_data->>'avatar_url',
+    NEW.raw_user_meta_data->>'provider_id'
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    display_name = COALESCE(EXCLUDED.display_name, public.users.display_name),
+    avatar_url = COALESCE(EXCLUDED.avatar_url, public.users.avatar_url),
+    updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger: Automatically create public.users record when auth.users is created
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- Trigger to automatically update vote_count on insert
 CREATE OR REPLACE FUNCTION update_vote_count()

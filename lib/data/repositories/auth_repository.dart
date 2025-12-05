@@ -26,21 +26,18 @@ class AuthRepository {
   /// Web: Use Supabase's native OAuth flow
   Future<void> _signInWithGoogleWeb() async {
     debugPrint('AuthRepository: Starting Supabase OAuth for Web...');
-    
+
     // Get the current URL for redirect (without hash/query params)
     final currentUrl = Uri.base.origin;
     debugPrint('AuthRepository: Redirect URL: $currentUrl');
-    
+
     await _supabase.auth.signInWithOAuth(
       OAuthProvider.google,
       redirectTo: currentUrl,
-      scopes: 'email openid profile https://www.googleapis.com/auth/photoslibrary.readonly https://www.googleapis.com/auth/photoslibrary',
-      queryParams: {
-        'access_type': 'offline',
-        'prompt': 'consent',
-      },
+      scopes: 'email openid profile',
+      queryParams: {'access_type': 'offline', 'prompt': 'consent'},
     );
-    
+
     // Note: This is a redirect-based flow on web.
     // The page will redirect to Google and back to the app.
     // The auth state will be updated via authStateChanges stream.
@@ -50,7 +47,7 @@ class AuthRepository {
   Future<AuthResponse> _signInWithGoogleMobile() async {
     try {
       debugPrint('AuthRepository: Starting Google Sign-In for Mobile...');
-      
+
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
         throw 'Google Sign-In aborted.';

@@ -5,7 +5,6 @@ enum VotingType { like, stars, categories }
 class Contest {
   final String id;
   final String hostUserId;
-  final String googleAlbumId;
   final String title;
   final String? description;
   final ContestStatus status;
@@ -18,7 +17,6 @@ class Contest {
   Contest({
     required this.id,
     required this.hostUserId,
-    required this.googleAlbumId,
     required this.title,
     this.description,
     required this.status,
@@ -33,11 +31,10 @@ class Contest {
     return Contest(
       id: json['id'],
       hostUserId: json['host_user_id'],
-      googleAlbumId: json['google_album_id'],
       title: json['title'],
       description: json['description'],
       status: ContestStatus.values.firstWhere(
-        (e) => e.name == json['status'],
+        (e) => e.toString().split('.').last == json['status'],
         orElse: () => ContestStatus.draft,
       ),
       startAt: json['start_at'] != null
@@ -45,7 +42,7 @@ class Contest {
           : null,
       endAt: json['end_at'] != null ? DateTime.parse(json['end_at']) : null,
       votingType: VotingType.values.firstWhere(
-        (e) => e.name == json['voting_type'],
+        (e) => e.toString().split('.').last == json['voting_type'],
         orElse: () => VotingType.like,
       ),
       showVoteCounts: json['show_vote_counts'] ?? false,

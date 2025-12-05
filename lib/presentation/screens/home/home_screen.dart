@@ -264,7 +264,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                             ),
                                           ),
                                           _StatusBadge(
-                                            status: contest.status.name,
+                                            status: contest.status
+                                                .toString()
+                                                .split('.')
+                                                .last,
                                           ),
                                         ],
                                       ),
@@ -273,7 +276,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                         children: [
                                           _InfoChip(
                                             icon: Icons.how_to_vote_outlined,
-                                            label: contest.votingType.name,
+                                            label: contest.votingType
+                                                .toString()
+                                                .split('.')
+                                                .last,
                                           ),
                                           const SizedBox(width: 12),
                                           _InfoChip(
