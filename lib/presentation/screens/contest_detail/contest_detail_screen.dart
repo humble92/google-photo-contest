@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:humble_photo_contest/data/models/contest.dart';
 import 'package:humble_photo_contest/data/models/photo.dart';
+import 'package:humble_photo_contest/presentation/common_widgets/pass_key_dialog.dart';
 import 'package:humble_photo_contest/presentation/providers/auth_provider.dart';
 import 'package:humble_photo_contest/presentation/providers/contest_provider.dart';
 import 'package:humble_photo_contest/presentation/providers/photo_provider.dart';
@@ -22,7 +23,7 @@ class ContestDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _ContestDetailScreenState extends ConsumerState<ContestDetailScreen> {
-  late Future<List<Photo>> _photosFuture;
+  Future<List<Photo>>? _photosFuture; // Make nullable
   Set<String> _votedPhotoIds = {};
   Map<String, int> _voteCounts = {};
   final ImagePicker _picker = ImagePicker();
@@ -31,6 +32,45 @@ class _ContestDetailScreenState extends ConsumerState<ContestDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _checkAccessAndInitialize();
+  }
+
+  Future<void> _checkAccessAndInitialize() async {
+    // Check if this is a private contest and user is not the host
+    final user = ref.read(currentUserProvider);
+    final isHost = user?.id == widget.contest.hostUserId;
+
+    if (widget.contest.isPrivate && !isHost) {
+      // Show pass key dialog after first frame
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        final passKey = await showPassKeyDialog(
+          context: context,
+          onVerify: (inputKey) async {
+            // Verify pass key
+            return await ref
+                .read(contestRepositoryProvider)
+                .verifyPassKey(widget.contest.id, inputKey);
+          },
+          contestTitle: widget.contest.title,
+        );
+
+        if (passKey == null) {
+          // User cancelled, go back
+          if (mounted) {
+            context.pop();
+          }
+        } else {
+          // Access granted - initialize data
+          _initializeData();
+        }
+      });
+    } else {
+      // Public contest or user is host - grant immediate access
+      _initializeData();
+    }
+  }
+
+  void _initializeData() {
     _refreshPhotos();
     _fetchMyVotes();
     if (widget.contest.showVoteCounts) {
@@ -218,164 +258,180 @@ class _ContestDetailScreenState extends ConsumerState<ContestDetailScreen> {
             : const Icon(Icons.add_a_photo),
         label: Text(_isUploading ? 'Uploading...' : 'Submit Photo'),
       ),
-      body: FutureBuilder<List<Photo>>(
-        future: _photosFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          }
-          final photos = snapshot.data ?? [];
-          if (photos.isEmpty) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.photo_library_outlined,
-                    size: 64,
-                    color: Colors.grey,
-                  ),
-                  SizedBox(height: 16),
-                  Text('No photos yet. Be the first to submit!'),
-                ],
-              ),
-            );
-          }
-
-          return GridView.builder(
-            padding: const EdgeInsets.all(8),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-            ),
-            itemCount: photos.length,
-            itemBuilder: (context, index) {
-              final photo = photos[index];
-              final isVoted = _votedPhotoIds.contains(photo.id);
-              final voteCount = _voteCounts[photo.id] ?? 0;
-              final photoUrl = ref
-                  .read(photoRepositoryProvider)
-                  .getPhotoUrl(photo.storagePath);
-
-              return Stack(
-                fit: StackFit.expand,
-                children: [
-                  CachedNetworkImage(
-                    imageUrl: photoUrl,
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) =>
-                        Container(color: Colors.grey[300]),
-                    errorWidget: (context, url, error) =>
-                        const Icon(Icons.error),
-                  ),
-                  // Gradient overlay for better text visibility
-                  Positioned(
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    child: Container(
-                      height: 50,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.bottomCenter,
-                          end: Alignment.topCenter,
-                          colors: [
-                            Colors.black.withOpacity(0.7),
-                            Colors.transparent,
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    bottom: 8,
-                    right: 8,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+      body: _photosFuture == null
+          ? const Center(child: CircularProgressIndicator())
+          : FutureBuilder<List<Photo>>(
+              future: _photosFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return Center(child: Text('Error: ${snapshot.error}'));
+                }
+                final photos = snapshot.data ?? [];
+                if (photos.isEmpty) {
+                  return const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        if (widget.contest.showVoteCounts)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 8.0),
-                            child: Text(
-                              '$voteCount',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
+                        Icon(
+                          Icons.photo_library_outlined,
+                          size: 64,
+                          color: Colors.grey,
+                        ),
+                        SizedBox(height: 16),
+                        Text('No photos yet. Be the first to submit!'),
+                      ],
+                    ),
+                  );
+                }
+
+                return GridView.builder(
+                  padding: const EdgeInsets.all(8),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8,
+                  ),
+                  itemCount: photos.length,
+                  itemBuilder: (context, index) {
+                    final photo = photos[index];
+                    final isVoted = _votedPhotoIds.contains(photo.id);
+                    final voteCount = _voteCounts[photo.id] ?? 0;
+                    final photoUrl = ref
+                        .read(photoRepositoryProvider)
+                        .getPhotoUrl(photo.storagePath);
+
+                    return Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        CachedNetworkImage(
+                          imageUrl: photoUrl,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) =>
+                              Container(color: Colors.grey[300]),
+                          errorWidget: (context, url, error) =>
+                              const Icon(Icons.error),
+                        ),
+                        // Gradient overlay for better text visibility
+                        Positioned(
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          child: Container(
+                            height: 50,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.bottomCenter,
+                                end: Alignment.topCenter,
+                                colors: [
+                                  Colors.black.withValues(alpha: 0.7),
+                                  Colors.transparent,
+                                ],
                               ),
                             ),
                           ),
-                        IconButton(
-                          icon: Icon(
-                            isVoted ? Icons.favorite : Icons.favorite_border,
-                            color: isVoted ? Colors.red : Colors.white,
-                          ),
-                          onPressed: () async {
-                            try {
-                              final user = ref.read(currentUserProvider);
-                              if (user == null) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Please login to vote'),
-                                  ),
-                                );
-                                return;
-                              }
-
-                              if (isVoted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'You have already voted for this photo',
+                        ),
+                        Positioned(
+                          bottom: 8,
+                          right: 8,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (widget.contest.showVoteCounts)
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 8.0),
+                                  child: Text(
+                                    '$voteCount',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
                                     ),
                                   ),
-                                );
-                                return;
-                              }
+                                ),
+                              IconButton(
+                                icon: Icon(
+                                  isVoted
+                                      ? Icons.favorite
+                                      : Icons.favorite_border,
+                                  color: isVoted ? Colors.red : Colors.white,
+                                ),
+                                onPressed: () async {
+                                  try {
+                                    final user = ref.read(currentUserProvider);
+                                    if (user == null) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Please login to vote'),
+                                        ),
+                                      );
+                                      return;
+                                    }
 
-                              await ref
-                                  .read(voteRepositoryProvider)
-                                  .castVote(
-                                    userId: user.id,
-                                    contestId: widget.contest.id,
-                                    photoId: photo.id,
-                                  );
+                                    if (isVoted) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'You have already voted for this photo',
+                                          ),
+                                        ),
+                                      );
+                                      return;
+                                    }
 
-                              setState(() {
-                                _votedPhotoIds.add(photo.id);
-                                if (widget.contest.showVoteCounts) {
-                                  _voteCounts[photo.id] =
-                                      (_voteCounts[photo.id] ?? 0) + 1;
-                                }
-                              });
+                                    await ref
+                                        .read(voteRepositoryProvider)
+                                        .castVote(
+                                          userId: user.id,
+                                          contestId: widget.contest.id,
+                                          photoId: photo.id,
+                                        );
 
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Vote cast!')),
-                                );
-                              }
-                            } catch (e) {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Failed to vote: $e')),
-                                );
-                              }
-                            }
-                          },
+                                    setState(() {
+                                      _votedPhotoIds.add(photo.id);
+                                      if (widget.contest.showVoteCounts) {
+                                        _voteCounts[photo.id] =
+                                            (_voteCounts[photo.id] ?? 0) + 1;
+                                      }
+                                    });
+
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Vote cast!'),
+                                        ),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Failed to vote: $e'),
+                                        ),
+                                      );
+                                    }
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
                         ),
                       ],
-                    ),
-                  ),
-                ],
-              );
-            },
-          );
-        },
-      ),
+                    );
+                  },
+                );
+              },
+            ),
     );
   }
 }
