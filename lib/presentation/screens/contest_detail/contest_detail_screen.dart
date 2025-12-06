@@ -73,7 +73,9 @@ class _ContestDetailScreenState extends ConsumerState<ContestDetailScreen> {
   void _initializeData() {
     _refreshPhotos();
     _fetchMyVotes();
-    if (widget.contest.showVoteCounts) {
+    // Always fetch vote counts if contest has ended or if show_vote_counts is enabled
+    if (widget.contest.showVoteCounts ||
+        widget.contest.status == ContestStatus.ended) {
       _fetchVoteCounts();
     }
   }
@@ -291,6 +293,37 @@ class _ContestDetailScreenState extends ConsumerState<ContestDetailScreen> {
                   );
                 }
 
+                // Sort photos by vote count if contest has ended
+                final sortedPhotos =
+                    widget.contest.status == ContestStatus.ended
+                    ? (photos.toList()..sort((a, b) {
+                        final aVotes = _voteCounts[a.id] ?? 0;
+                        final bVotes = _voteCounts[b.id] ?? 0;
+                        return bVotes.compareTo(aVotes); // Descending order
+                      }))
+                    : photos;
+
+                // Calculate rankings with tie handling
+                Map<String, int> photoRanks = {};
+                if (widget.contest.status == ContestStatus.ended) {
+                  int currentRank = 1;
+                  int? previousVoteCount;
+
+                  for (int i = 0; i < sortedPhotos.length; i++) {
+                    final photo = sortedPhotos[i];
+                    final voteCount = _voteCounts[photo.id] ?? 0;
+
+                    // If this is not the first photo and vote count is different, update rank
+                    if (previousVoteCount != null &&
+                        voteCount != previousVoteCount) {
+                      currentRank = i + 1; // Jump to current position
+                    }
+
+                    photoRanks[photo.id] = currentRank;
+                    previousVoteCount = voteCount;
+                  }
+                }
+
                 return GridView.builder(
                   padding: const EdgeInsets.all(8),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -298,14 +331,20 @@ class _ContestDetailScreenState extends ConsumerState<ContestDetailScreen> {
                     crossAxisSpacing: 8,
                     mainAxisSpacing: 8,
                   ),
-                  itemCount: photos.length,
+                  itemCount: sortedPhotos.length,
                   itemBuilder: (context, index) {
-                    final photo = photos[index];
+                    final photo = sortedPhotos[index];
                     final isVoted = _votedPhotoIds.contains(photo.id);
                     final voteCount = _voteCounts[photo.id] ?? 0;
                     final photoUrl = ref
                         .read(photoRepositoryProvider)
                         .getPhotoUrl(photo.storagePath);
+
+                    // Determine ranking for ended contests
+                    final isEnded =
+                        widget.contest.status == ContestStatus.ended;
+                    final rank = isEnded ? photoRanks[photo.id] : null;
+                    final showRank = isEnded && rank != null && rank <= 3;
 
                     return Stack(
                       fit: StackFit.expand,
@@ -318,6 +357,59 @@ class _ContestDetailScreenState extends ConsumerState<ContestDetailScreen> {
                           errorWidget: (context, url, error) =>
                               const Icon(Icons.error),
                         ),
+                        // Ranking badge for top 3
+                        if (showRank)
+                          Positioned(
+                            top: 8,
+                            left: 8,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: rank == 1
+                                    ? Colors.amber
+                                    : rank == 2
+                                    ? Colors.grey[400]
+                                    : Colors.brown[300],
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.3),
+                                    blurRadius: 4,
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    rank == 1
+                                        ? Icons.emoji_events
+                                        : rank == 2
+                                        ? Icons.emoji_events_outlined
+                                        : Icons.workspace_premium,
+                                    color: Colors.white,
+                                    size: 16,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    rank == 1
+                                        ? '1st'
+                                        : rank == 2
+                                        ? '2nd'
+                                        : '3rd',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         // Gradient overlay for better text visibility
                         Positioned(
                           bottom: 0,
@@ -343,111 +435,129 @@ class _ContestDetailScreenState extends ConsumerState<ContestDetailScreen> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              if (widget.contest.showVoteCounts)
+                              if (widget.contest.showVoteCounts || isEnded)
                                 Padding(
                                   padding: const EdgeInsets.only(right: 8.0),
-                                  child: Text(
-                                    '$voteCount',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withValues(
+                                        alpha: 0.6,
+                                      ),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      '$voteCount',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
                                     ),
                                   ),
                                 ),
-                              IconButton(
-                                icon: Icon(
-                                  isVoted
-                                      ? Icons.favorite
-                                      : Icons.favorite_border,
-                                  color: isVoted ? Colors.red : Colors.white,
+                              // Only show vote button if contest is active
+                              if (widget.contest.status == ContestStatus.active)
+                                IconButton(
+                                  icon: Icon(
+                                    isVoted
+                                        ? Icons.favorite
+                                        : Icons.favorite_border,
+                                    color: isVoted ? Colors.red : Colors.white,
+                                  ),
+                                  onPressed: () async {
+                                    try {
+                                      final user = ref.read(
+                                        currentUserProvider,
+                                      );
+                                      if (user == null) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Please login to vote',
+                                            ),
+                                          ),
+                                        );
+                                        return;
+                                      }
+
+                                      if (isVoted) {
+                                        // Remove vote (unvote)
+                                        print(
+                                          '🔴 Removing vote for photo: ${photo.id}',
+                                        );
+                                        await ref
+                                            .read(voteRepositoryProvider)
+                                            .removeVote(
+                                              userId: user.id,
+                                              photoId: photo.id,
+                                            );
+                                        print('✅ Vote removed from DB');
+
+                                        // Refresh data from database
+                                        await _fetchMyVotes();
+                                        if (widget.contest.showVoteCounts) {
+                                          await _fetchVoteCounts();
+                                        }
+
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('Vote removed!'),
+                                            ),
+                                          );
+                                        }
+                                      } else {
+                                        // Cast vote
+                                        print(
+                                          '🟢 Casting vote for photo: ${photo.id}',
+                                        );
+                                        await ref
+                                            .read(voteRepositoryProvider)
+                                            .castVote(
+                                              userId: user.id,
+                                              contestId: widget.contest.id,
+                                              photoId: photo.id,
+                                            );
+                                        print('✅ Vote cast to DB');
+
+                                        // Refresh data from database
+                                        await _fetchMyVotes();
+                                        if (widget.contest.showVoteCounts) {
+                                          await _fetchVoteCounts();
+                                        }
+
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('Vote cast!'),
+                                            ),
+                                          );
+                                        }
+                                      }
+                                    } catch (e) {
+                                      print('❌ Vote error: $e');
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text('Failed to vote: $e'),
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  },
                                 ),
-                                onPressed: () async {
-                                  try {
-                                    final user = ref.read(currentUserProvider);
-                                    if (user == null) {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Please login to vote'),
-                                        ),
-                                      );
-                                      return;
-                                    }
-
-                                    if (isVoted) {
-                                      // Remove vote (unvote)
-                                      print(
-                                        '🔴 Removing vote for photo: ${photo.id}',
-                                      );
-                                      await ref
-                                          .read(voteRepositoryProvider)
-                                          .removeVote(
-                                            userId: user.id,
-                                            photoId: photo.id,
-                                          );
-                                      print('✅ Vote removed from DB');
-
-                                      // Refresh data from database
-                                      await _fetchMyVotes();
-                                      if (widget.contest.showVoteCounts) {
-                                        await _fetchVoteCounts();
-                                      }
-
-                                      if (context.mounted) {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('Vote removed!'),
-                                          ),
-                                        );
-                                      }
-                                    } else {
-                                      // Cast vote
-                                      print(
-                                        '🟢 Casting vote for photo: ${photo.id}',
-                                      );
-                                      await ref
-                                          .read(voteRepositoryProvider)
-                                          .castVote(
-                                            userId: user.id,
-                                            contestId: widget.contest.id,
-                                            photoId: photo.id,
-                                          );
-                                      print('✅ Vote cast to DB');
-
-                                      // Refresh data from database
-                                      await _fetchMyVotes();
-                                      if (widget.contest.showVoteCounts) {
-                                        await _fetchVoteCounts();
-                                      }
-
-                                      if (context.mounted) {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('Vote cast!'),
-                                          ),
-                                        );
-                                      }
-                                    }
-                                  } catch (e) {
-                                    print('❌ Vote error: $e');
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text('Failed to vote: $e'),
-                                        ),
-                                      );
-                                    }
-                                  }
-                                },
-                              ),
                             ],
                           ),
                         ),
