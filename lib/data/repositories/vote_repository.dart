@@ -18,6 +18,19 @@ class VoteRepository {
     });
   }
 
+  /// Remove a vote (unvote)
+  /// This deletes the vote record and triggers the decrement_photo_vote_count function
+  Future<void> removeVote({
+    required String userId,
+    required String photoId,
+  }) async {
+    await _supabase
+        .from('votes')
+        .delete()
+        .eq('user_id', userId)
+        .eq('photo_id', photoId);
+  }
+
   Future<int> getVoteCount(String photoId) async {
     final response = await _supabase
         .from('votes')
@@ -27,6 +40,8 @@ class VoteRepository {
   }
 
   Future<Set<String>> getMyVotes(String userId, String contestId) async {
+    print('🔍 Fetching votes for user: $userId, contest: $contestId');
+
     // Fetch all votes by user for photos in this contest
     final response = await _supabase
         .from('votes')
@@ -34,10 +49,19 @@ class VoteRepository {
         .eq('user_id', userId)
         .eq('photo.contest_id', contestId);
 
+    print('🔍 getMyVotes response: $response');
+    print('🔍 Response type: ${response.runtimeType}');
+    print('🔍 Response length: ${(response as List).length}');
+
     final votedPhotoIds = <String>{};
     for (final record in response) {
-      votedPhotoIds.add(record['photo_id'] as String);
+      print('🔍 Processing record: $record');
+      final photoId = record['photo_id'] as String;
+      print('🔍 Adding photo_id: $photoId');
+      votedPhotoIds.add(photoId);
     }
+
+    print('✅ Final votedPhotoIds: $votedPhotoIds');
     return votedPhotoIds;
   }
 

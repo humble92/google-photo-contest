@@ -87,14 +87,18 @@ class _ContestDetailScreenState extends ConsumerState<ContestDetailScreen> {
   }
 
   Future<void> _fetchMyVotes() async {
+    print('📥 _fetchMyVotes called');
     final user = ref.read(currentUserProvider);
+    print('📥 Current user: ${user?.id}');
     if (user != null) {
       final votes = await ref
           .read(voteRepositoryProvider)
           .getMyVotes(user.id, widget.contest.id);
+      print('📥 Received votes: $votes');
       if (mounted) {
         setState(() {
           _votedPhotoIds = votes;
+          print('✅ _votedPhotoIds updated: $_votedPhotoIds');
         });
       }
     }
@@ -373,44 +377,65 @@ class _ContestDetailScreenState extends ConsumerState<ContestDetailScreen> {
                                     }
 
                                     if (isVoted) {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            'You have already voted for this photo',
-                                          ),
-                                        ),
+                                      // Remove vote (unvote)
+                                      print(
+                                        '🔴 Removing vote for photo: ${photo.id}',
                                       );
-                                      return;
-                                    }
+                                      await ref
+                                          .read(voteRepositoryProvider)
+                                          .removeVote(
+                                            userId: user.id,
+                                            photoId: photo.id,
+                                          );
+                                      print('✅ Vote removed from DB');
 
-                                    await ref
-                                        .read(voteRepositoryProvider)
-                                        .castVote(
-                                          userId: user.id,
-                                          contestId: widget.contest.id,
-                                          photoId: photo.id,
-                                        );
-
-                                    setState(() {
-                                      _votedPhotoIds.add(photo.id);
+                                      // Refresh data from database
+                                      await _fetchMyVotes();
                                       if (widget.contest.showVoteCounts) {
-                                        _voteCounts[photo.id] =
-                                            (_voteCounts[photo.id] ?? 0) + 1;
+                                        await _fetchVoteCounts();
                                       }
-                                    });
 
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Vote cast!'),
-                                        ),
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Vote removed!'),
+                                          ),
+                                        );
+                                      }
+                                    } else {
+                                      // Cast vote
+                                      print(
+                                        '🟢 Casting vote for photo: ${photo.id}',
                                       );
+                                      await ref
+                                          .read(voteRepositoryProvider)
+                                          .castVote(
+                                            userId: user.id,
+                                            contestId: widget.contest.id,
+                                            photoId: photo.id,
+                                          );
+                                      print('✅ Vote cast to DB');
+
+                                      // Refresh data from database
+                                      await _fetchMyVotes();
+                                      if (widget.contest.showVoteCounts) {
+                                        await _fetchVoteCounts();
+                                      }
+
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Vote cast!'),
+                                          ),
+                                        );
+                                      }
                                     }
                                   } catch (e) {
+                                    print('❌ Vote error: $e');
                                     if (context.mounted) {
                                       ScaffoldMessenger.of(
                                         context,
