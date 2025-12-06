@@ -60,7 +60,24 @@ class ContestRepository {
   }
 
   Future<void> deleteContest(String contestId) async {
-    // Photos and votes will CASCADE delete automatically due to foreign key constraints
+    // 1. Get all photos for this contest to delete their storage files
+    final photos = await _supabase
+        .from('photos')
+        .select('storage_path')
+        .eq('contest_id', contestId);
+
+    // 2. Delete storage files
+    for (final photo in photos as List) {
+      try {
+        final storagePath = photo['storage_path'] as String;
+        await _supabase.storage.from('contest_photos').remove([storagePath]);
+      } catch (e) {
+        // Continue even if some files fail to delete
+        print('Failed to delete storage file: $e');
+      }
+    }
+
+    // 3. Delete contest (photos and votes will CASCADE delete automatically)
     await _supabase.from('contests').delete().eq('id', contestId);
   }
 
@@ -69,6 +86,19 @@ class ContestRepository {
         .from('contests')
         .select()
         .eq('host_user_id', userId)
+        .order('created_at', ascending: false);
+
+    return (response as List).map((json) => Contest.fromJson(json)).toList();
+  }
+
+  /// Get all contests NOT hosted by the current user
+  /// This includes both public and private contests (private ones require pass key)
+  Future<List<Contest>> getAllOtherContests(String currentUserId) async {
+    final response = await _supabase
+        .from('contests')
+        .select()
+        .neq('host_user_id', currentUserId) // NOT equal to current user
+        .or('status.eq.active,status.eq.ended') // Only active or ended
         .order('created_at', ascending: false);
 
     return (response as List).map((json) => Contest.fromJson(json)).toList();
