@@ -11,6 +11,8 @@ class ContestRepository {
     required String title,
     String? description,
     required bool showVoteCounts,
+    bool isPrivate = false,
+    String? passKey,
   }) async {
     final response = await _supabase
         .from('contests')
@@ -21,11 +23,45 @@ class ContestRepository {
           'status': 'draft', // Default to draft
           'voting_type': 'like', // Default to like
           'show_vote_counts': showVoteCounts,
+          'is_private': isPrivate,
+          'pass_key': passKey,
         })
         .select()
         .single();
 
     return Contest.fromJson(response);
+  }
+
+  Future<Contest> updateContest({
+    required String contestId,
+    String? title,
+    String? description,
+    String? status,
+    bool? showVoteCounts,
+    bool? isPrivate,
+    String? passKey,
+  }) async {
+    final updates = <String, dynamic>{};
+    if (title != null) updates['title'] = title;
+    if (description != null) updates['description'] = description;
+    if (status != null) updates['status'] = status;
+    if (showVoteCounts != null) updates['show_vote_counts'] = showVoteCounts;
+    if (isPrivate != null) updates['is_private'] = isPrivate;
+    if (passKey != null) updates['pass_key'] = passKey;
+
+    final response = await _supabase
+        .from('contests')
+        .update(updates)
+        .eq('id', contestId)
+        .select()
+        .single();
+
+    return Contest.fromJson(response);
+  }
+
+  Future<void> deleteContest(String contestId) async {
+    // Photos and votes will CASCADE delete automatically due to foreign key constraints
+    await _supabase.from('contests').delete().eq('id', contestId);
   }
 
   Future<List<Contest>> getMyContests(String userId) async {
@@ -36,5 +72,40 @@ class ContestRepository {
         .order('created_at', ascending: false);
 
     return (response as List).map((json) => Contest.fromJson(json)).toList();
+  }
+
+  Future<Contest> getContestById(String contestId) async {
+    final response = await _supabase
+        .from('contests')
+        .select()
+        .eq('id', contestId)
+        .single();
+
+    return Contest.fromJson(response);
+  }
+
+  /// Verify if the provided pass key matches the contest's pass key
+  Future<bool> verifyPassKey(String contestId, String passKey) async {
+    final contest = await getContestById(contestId);
+    return contest.passKey == passKey;
+  }
+
+  /// Check if user can access a private contest
+  /// Returns true if contest is public, user is host, or valid pass key provided
+  Future<bool> canAccessContest({
+    required Contest contest,
+    required String userId,
+    String? passKey,
+  }) async {
+    // Public contests are accessible to everyone
+    if (!contest.isPrivate) return true;
+
+    // Host can always access their own contests
+    if (contest.hostUserId == userId) return true;
+
+    // Verify pass key for private contests
+    if (passKey != null && passKey == contest.passKey) return true;
+
+    return false;
   }
 }

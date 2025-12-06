@@ -12,6 +12,8 @@ class Contest {
   final DateTime? endAt;
   final VotingType votingType;
   final bool showVoteCounts;
+  final bool isPrivate;
+  final String? passKey;
   final DateTime createdAt;
 
   Contest({
@@ -24,6 +26,8 @@ class Contest {
     this.endAt,
     required this.votingType,
     required this.showVoteCounts,
+    this.isPrivate = false,
+    this.passKey,
     required this.createdAt,
   });
 
@@ -46,6 +50,8 @@ class Contest {
         orElse: () => VotingType.like,
       ),
       showVoteCounts: json['show_vote_counts'] ?? false,
+      isPrivate: json['is_private'] ?? false,
+      passKey: json['pass_key'],
       createdAt: DateTime.parse(json['created_at']),
     );
   }

@@ -1,11 +1,14 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:humble_photo_contest/data/models/contest.dart';
 import 'package:humble_photo_contest/data/models/photo.dart';
 import 'package:humble_photo_contest/presentation/providers/auth_provider.dart';
+import 'package:humble_photo_contest/presentation/providers/contest_provider.dart';
 import 'package:humble_photo_contest/presentation/providers/photo_provider.dart';
 import 'package:humble_photo_contest/presentation/providers/vote_provider.dart';
+import 'package:humble_photo_contest/presentation/screens/create_contest/edit_contest_screen.dart';
 import 'package:image_picker/image_picker.dart';
 
 class ContestDetailScreen extends ConsumerStatefulWidget {
@@ -125,10 +128,82 @@ class _ContestDetailScreenState extends ConsumerState<ContestDetailScreen> {
     }
   }
 
+  Future<void> _deleteContest() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Contest'),
+        content: const Text(
+          'Are you sure you want to delete this contest? '
+          'This will permanently delete all photos and votes associated with it.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await ref
+          .read(contestRepositoryProvider)
+          .deleteContest(widget.contest.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Contest deleted successfully')),
+        );
+        context.go('/'); // Navigate back to home
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to delete contest: $e')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final user = ref.watch(currentUserProvider);
+    final isHost = user?.id == widget.contest.hostUserId;
+
     return Scaffold(
-      appBar: AppBar(title: Text(widget.contest.title)),
+      appBar: AppBar(
+        title: Text(widget.contest.title),
+        actions: isHost
+            ? [
+                IconButton(
+                  icon: const Icon(Icons.edit),
+                  onPressed: () async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            EditContestScreen(contest: widget.contest),
+                      ),
+                    );
+                    // Refresh after editing
+                    _refreshPhotos();
+                  },
+                  tooltip: 'Edit Contest',
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete),
+                  onPressed: _deleteContest,
+                  tooltip: 'Delete Contest',
+                ),
+              ]
+            : null,
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _isUploading ? null : _pickAndUploadPhoto,
         icon: _isUploading

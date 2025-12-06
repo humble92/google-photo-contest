@@ -57,28 +57,3 @@ alter table public.photos enable row level security;
 create policy "Public photos are viewable by everyone"
   on public.photos for select
   using ( true );
-
--- Allow Authenticated Users to Create Contests
--- Users should be able to insert if they are the host
-DROP POLICY IF EXISTS "Users can create contests" ON public.contests;
-CREATE POLICY "Users can create contests"
-  ON public.contests
-  FOR INSERT
-  WITH CHECK ( auth.uid() = host_user_id );
-
--- Allow Hosts to View their own "Draft" Contests
--- The existing policy might only show 'active' or 'ended'.
--- We need to ensure hosts can see their own contests regardless of status.
-DROP POLICY IF EXISTS "Hosts can view own contests" ON public.contests;
-CREATE POLICY "Hosts can view own contests"
-  ON public.contests
-  FOR SELECT
-  USING ( auth.uid() = host_user_id );
-
--- Allow Hosts to Update their own contests (Already likely exists, but good to ensure)
-DROP POLICY IF EXISTS "Hosts can update own contests" ON public.contests;
-CREATE POLICY "Hosts can update own contests"
-  ON public.contests
-  FOR UPDATE
-  USING ( auth.uid() = host_user_id );
-

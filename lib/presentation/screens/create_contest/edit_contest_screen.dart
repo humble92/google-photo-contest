@@ -1,45 +1,54 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:humble_photo_contest/core/utils/pass_key_generator.dart';
-import 'package:humble_photo_contest/presentation/providers/auth_provider.dart';
+import 'package:humble_photo_contest/data/models/contest.dart';
 import 'package:humble_photo_contest/presentation/providers/contest_provider.dart';
-import 'package:humble_photo_contest/presentation/providers/link_scraper_provider.dart';
-import 'package:humble_photo_contest/presentation/providers/photo_provider.dart';
 
-class CreateContestScreen extends ConsumerStatefulWidget {
-  const CreateContestScreen({super.key});
+class EditContestScreen extends ConsumerStatefulWidget {
+  final Contest contest;
+
+  const EditContestScreen({super.key, required this.contest});
 
   @override
-  ConsumerState<CreateContestScreen> createState() =>
-      _CreateContestScreenState();
+  ConsumerState<EditContestScreen> createState() => _EditContestScreenState();
 }
 
-class _CreateContestScreenState extends ConsumerState<CreateContestScreen> {
+class _EditContestScreenState extends ConsumerState<EditContestScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _titleController = TextEditingController();
-  final _descriptionController = TextEditingController();
-  final _linkController = TextEditingController();
-  final _passKeyController = TextEditingController();
-  bool _showVoteCounts = false;
-  bool _isPrivate = false;
+  late TextEditingController _titleController;
+  late TextEditingController _descriptionController;
+  late TextEditingController _passKeyController;
+  late bool _showVoteCounts;
+  late bool _isPrivate;
+  late ContestStatus _status;
   bool _isLoading = false;
-  String _loadingMessage = '';
 
   @override
   void initState() {
     super.initState();
-    // Generate initial pass key
-    _passKeyController.text = PassKeyGenerator.generate();
+    _titleController = TextEditingController(text: widget.contest.title);
+    _descriptionController = TextEditingController(
+      text: widget.contest.description ?? '',
+    );
+    _passKeyController = TextEditingController(
+      text: widget.contest.passKey ?? '',
+    );
+    _showVoteCounts = widget.contest.showVoteCounts;
+    _isPrivate = widget.contest.isPrivate;
+    _status = widget.contest.status;
+
+    // Generate pass key if private but no key exists
+    if (_isPrivate && _passKeyController.text.isEmpty) {
+      _passKeyController.text = PassKeyGenerator.generate();
+    }
   }
 
   @override
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
-    _linkController.dispose();
     _passKeyController.dispose();
     super.dispose();
   }
@@ -57,84 +66,44 @@ class _CreateContestScreenState extends ConsumerState<CreateContestScreen> {
     );
   }
 
-  Future<void> _createContest() async {
+  Future<void> _updateContest() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
       _isLoading = true;
-      _loadingMessage = 'Creating contest...';
     });
 
     try {
-      final user = ref.read(currentUserProvider);
-      if (user == null) {
-        throw Exception('User not logged in');
-      }
-
-      // 1. Create Contest
-      final contest = await ref
+      await ref
           .read(contestRepositoryProvider)
-          .createContest(
-            hostUserId: user.id,
+          .updateContest(
+            contestId: widget.contest.id,
             title: _titleController.text.trim(),
             description: _descriptionController.text.trim().isEmpty
                 ? null
                 : _descriptionController.text.trim(),
+            status: _status.toString().split('.').last,
             showVoteCounts: _showVoteCounts,
             isPrivate: _isPrivate,
             passKey: _isPrivate ? _passKeyController.text.trim() : null,
           );
 
-      // 2. Import Photos from Link (if provided)
-      final link = _linkController.text.trim();
-      if (link.isNotEmpty) {
-        setState(() {
-          _loadingMessage = 'Scraping photos from link...';
-        });
-
-        final imageUrls = await ref
-            .read(linkScraperServiceProvider)
-            .scrapePhotos(link);
-
-        if (imageUrls.isEmpty) {
-          throw Exception('No photos found in the provided link.');
-        }
-
-        int count = 0;
-        for (final url in imageUrls) {
-          count++;
-          setState(() {
-            _loadingMessage =
-                'Importing photo $count of ${imageUrls.length}...';
-          });
-
-          await ref
-              .read(photoRepositoryProvider)
-              .uploadPhotoFromUrl(
-                contestId: contest.id,
-                userId: user.id,
-                imageUrl: url,
-              );
-        }
-      }
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Contest created successfully!')),
+          const SnackBar(content: Text('Contest updated successfully!')),
         );
-        context.go('/');
+        context.pop();
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Failed to create contest: $e')));
+        ).showSnackBar(SnackBar(content: Text('Failed to update contest: $e')));
       }
     } finally {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _loadingMessage = '';
         });
       }
     }
@@ -145,7 +114,7 @@ class _CreateContestScreenState extends ConsumerState<CreateContestScreen> {
     final isPremiumAsync = ref.watch(isPremiumUserProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Create Contest')),
+      appBar: AppBar(title: const Text('Edit Contest')),
       body: Form(
         key: _formKey,
         child: ListView(
@@ -174,20 +143,25 @@ class _CreateContestScreenState extends ConsumerState<CreateContestScreen> {
               maxLines: 3,
             ),
             const SizedBox(height: 16),
-            TextFormField(
-              controller: _linkController,
-              enabled: !kIsWeb,
-              decoration: InputDecoration(
-                labelText: 'Import from Link (Optional)',
-                hintText: kIsWeb
-                    ? 'Not available on web'
-                    : 'https://photos.app.goo.gl/...',
-                border: const OutlineInputBorder(),
-                helperText: kIsWeb
-                    ? 'Link import is only available on mobile due to browser security restrictions.'
-                    : 'Paste a shared album link to automatically import photos.',
-                helperMaxLines: 2,
+            DropdownButtonFormField<ContestStatus>(
+              value: _status,
+              decoration: const InputDecoration(
+                labelText: 'Contest Status',
+                border: OutlineInputBorder(),
               ),
+              items: ContestStatus.values.map((status) {
+                return DropdownMenuItem(
+                  value: status,
+                  child: Text(_formatStatus(status)),
+                );
+              }).toList(),
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() {
+                    _status = value;
+                  });
+                }
+              },
             ),
             const SizedBox(height: 16),
             SwitchListTile(
@@ -241,6 +215,10 @@ class _CreateContestScreenState extends ConsumerState<CreateContestScreen> {
                     ? (value) {
                         setState(() {
                           _isPrivate = value;
+                          if (value && _passKeyController.text.isEmpty) {
+                            _passKeyController.text =
+                                PassKeyGenerator.generate();
+                          }
                         });
                       }
                     : null,
@@ -290,28 +268,32 @@ class _CreateContestScreenState extends ConsumerState<CreateContestScreen> {
             ],
             const SizedBox(height: 24),
             FilledButton(
-              onPressed: _isLoading ? null : _createContest,
+              onPressed: _isLoading ? null : _updateContest,
               child: _isLoading
-                  ? Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Text(_loadingMessage),
-                      ],
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
-                  : const Text('Create Contest'),
+                  : const Text('Update Contest'),
             ),
           ],
         ),
       ),
     );
+  }
+
+  String _formatStatus(ContestStatus status) {
+    switch (status) {
+      case ContestStatus.draft:
+        return 'Draft';
+      case ContestStatus.active:
+        return 'Active';
+      case ContestStatus.ended:
+        return 'Ended';
+    }
   }
 }
