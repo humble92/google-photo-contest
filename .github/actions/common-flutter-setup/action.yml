@@ -1,0 +1,48 @@
+# .github/actions/common-flutter-setup/action.yml
+name: Common Flutter Setup
+description: Set up Flutter, cache dependencies and create .env file
+inputs:
+  pub-cache-path:
+    description: "Path to Flutter Pub cache"
+    required: true
+  flutter-architecture:
+    description: "Flutter architecture"
+    required: false
+    default: ""
+  shell:
+    description: "Shell to use in run steps"
+    required: true
+    default: "bash"
+runs:
+  using: "composite"
+  steps:
+    - name: Cache Flutter Pub Packages
+      uses: actions/cache@v4
+      with:
+        path: ${{ inputs.pub-cache-path }}
+        key: ${{ runner.os }}-pub-cache-${{ hashFiles('pubspec.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-pub-cache-
+
+    - name: Set up Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: ${{ env.FLUTTER_VERSION }}
+        channel: ${{ env.FLUTTER_CHANNEL }}
+        cache: true
+        cache-key: "flutter-:os:-:channel:-:version:-:arch:-:hash:"
+        architecture: ${{ inputs.flutter-architecture }}
+
+    - run: flutter --version
+      shell: ${{ inputs.shell }}
+
+    - name: Install dependencies
+      run: flutter pub get
+      shell: ${{ inputs.shell }}
+
+    - name: Create .env file
+      run: |
+        echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" > .env
+        echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
+        echo "GOOGLE_WEB_CLIENT_ID=${{ secrets.GOOGLE_WEB_CLIENT_ID }}" >> .env
+        echo "GOOGLE_IOS_CLIENT_ID=${{ secrets.GOOGLE_IOS_CLIENT_ID }}" >> .env

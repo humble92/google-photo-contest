@@ -1,0 +1,205 @@
+name: Flutter CI/CD
+
+env:
+  FLUTTER_VERSION: "3.35.5"
+  FLUTTER_CHANNEL: "stable"
+  
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+jobs:
+  # Job 1: Build and Test
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Run Common Flutter Setup
+        uses: ./.github/actions/common-flutter-setup
+        with:
+          pub-cache-path: ~/.pub-cache
+
+      - name: Analyze code
+        run: flutter analyze
+      
+      - name: Run tests
+        run: flutter test
+
+  # Job 2: Build Web
+  build-web:
+    name: Build Web
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Run Common Flutter Setup
+        uses: ./.github/actions/common-flutter-setup
+        with:
+          pub-cache-path: ~/.pub-cache
+      
+      - name: Build Web
+        run: flutter build web --release --web-renderer canvaskit
+      
+      - name: Upload Web Build
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build
+          path: build/web
+          retention-days: 7
+
+  # Job 3: Build Android
+  build-android:
+    name: Build Android
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          cache: 'gradle'
+      
+      - name: Run Common Flutter Setup
+        uses: ./.github/actions/common-flutter-setup
+        with:
+          pub-cache-path: ~/.pub-cache
+      
+      - name: Decode keystore
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
+      
+      - name: Create key.properties
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        run: |
+          cat > android/key.properties << EOF
+          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          storeFile=upload-keystore.jks
+          EOF
+      
+      - name: Build APK
+        run: flutter build apk --release
+      
+      - name: Build App Bundle
+        run: flutter build appbundle --release
+      
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 7
+      
+      - name: Upload App Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-appbundle
+          path: build/app/outputs/bundle/release/app-release.aab
+          retention-days: 7
+
+      - name: Upload Native Debug Symbols
+        uses: actions/upload-artifact@v4
+        id: native-debug-symbols
+        with:
+          name: "native-debug-symbols"
+          path: build/app/intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib/*
+          retention-days: 7
+
+      # mapping.txt, usage.txt, resources.txt, etc.
+      - name: Upload Mapping File
+        uses: actions/upload-artifact@v4
+        id: mapping-file
+        with:
+          name: "android-mapping-files"
+          path: build/app/outputs/mapping/release/*
+          retention-days: 7
+
+      # - name: Deploy to Play Store
+      #   uses: r0adkll/upload-google-play@v1
+      #   with:
+      #     serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT }}
+      #     packageName: work.ninefruits.photocontest.humble_photo_contest
+      #     releaseFiles: build/app/outputs/bundle/release/app-release.aab
+      #     track: internal
+
+  # Job 4: Build iOS
+  build-ios:
+    name: Build iOS
+    needs: test
+    runs-on: macos-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Run Common Flutter Setup
+        uses: ./.github/actions/common-flutter-setup
+        with:
+          pub-cache-path: ~/.pub-cache
+          shell: bash
+
+      - name: Install CocoaPods
+        run: |
+          cd ios
+          pod install
+      
+      - name: Build iOS (No Codesign)
+        run: flutter build ios --release --no-codesign
+      
+      - name: Upload iOS Build
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build
+          path: build/ios/iphoneos
+          retention-days: 7
+
+  # Optional: Deploy Web to GitHub Pages
+  deploy-web:
+    name: Deploy Web to GitHub Pages
+    needs: build-web
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    
+    steps:
+      - name: Download Web Build
+        uses: actions/download-artifact@v4
+        with:
+          name: web-build
+          path: web-build
+      
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+      
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: web-build
+      
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
