@@ -69,6 +69,12 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  # Web-specific configuration
+  # web:
+  #   # Base path for GitHub Pages deployment
+  #   # Remove or set to '/' when using custom domain
+  #   base: /google-photo-contest/
+
   # To add assets to your application, add an assets section, like this:
   assets:
     - .env
