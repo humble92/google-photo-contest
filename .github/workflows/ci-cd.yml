@@ -81,20 +81,30 @@ jobs:
         with:
           pub-cache-path: ~/.pub-cache
       
-      - name: Decode keystore
-        if: secrets.ANDROID_KEYSTORE_BASE64 != ''
+      - name: Decode keystore (optional)
+        continue-on-error: true
         run: |
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
+          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
+            echo "✅ Keystore decoded successfully"
+          else
+            echo "⚠️  No keystore found, will use debug signing"
+          fi
       
-      - name: Create key.properties
-        if: secrets.ANDROID_KEYSTORE_BASE64 != ''
+      - name: Create key.properties (optional)
+        continue-on-error: true
         run: |
-          cat > android/key.properties << EOF
+          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+            cat > android/key.properties << EOF
           storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
           keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
           storeFile=upload-keystore.jks
           EOF
+            echo "✅ key.properties created successfully"
+          else
+            echo "⚠️  No keystore secrets found, skipping key.properties"
+          fi
       
       - name: Build APK
         run: flutter build apk --release
