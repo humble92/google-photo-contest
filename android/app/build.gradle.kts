@@ -52,7 +52,15 @@ android {
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            // Use release signing if keystore exists, otherwise fall back to debug
+            signingConfig = if (keystorePropertiesFile.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                // Fall back to debug signing when keystore is not available
+                // This allows builds to succeed in CI without secrets configured
+                println("⚠️  Warning: No keystore found, using debug signing for release build")
+                signingConfigs.getByName("debug")
+            }
             
             // ProGuard config
             isMinifyEnabled = true

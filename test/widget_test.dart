@@ -1,30 +1,31 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
+/// Widget tests for the Photo Contest app.
+///
+/// These tests verify basic app structure and configuration.
+/// Note: Full integration tests requiring Supabase would need additional mocking.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:humble_photo_contest/main.dart';
+import 'package:humble_photo_contest/core/theme/app_theme.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  group('AppTheme Tests', () {
+    test('lightTheme is configured', () {
+      final theme = AppTheme.lightTheme;
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+      expect(theme, isNotNull);
+      expect(theme.brightness, Brightness.light);
+    });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    test('darkTheme is configured', () {
+      final theme = AppTheme.darkTheme;
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+      expect(theme, isNotNull);
+      expect(theme.brightness, Brightness.dark);
+    });
+
+    test('Both themes use Material 3', () {
+      expect(AppTheme.lightTheme.useMaterial3, true);
+      expect(AppTheme.darkTheme.useMaterial3, true);
+    });
   });
 }
