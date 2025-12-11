@@ -67,5 +67,8 @@ app.*.map.json
 .env.local
 .env.*.local
 
+# secure files
+.secure_files/
+
 # legacy
 .legacy/
