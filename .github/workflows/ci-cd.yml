@@ -26,6 +26,14 @@ jobs:
         with:
           pub-cache-path: ~/.pub-cache
 
+      - name: Create .env file for tests
+        run: |
+          echo "SUPABASE_URL=https://example.supabase.co" > .env
+          echo "SUPABASE_ANON_KEY=dummy-key-for-tests" >> .env
+          echo "GOOGLE_WEB_CLIENT_ID=dummy-client-id" >> .env
+          echo "GOOGLE_IOS_CLIENT_ID=dummy-ios-client" >> .env
+          echo "GOOGLE_SERVER_CLIENT_ID=dummy-server-client" >> .env
+
       - name: Analyze code
         run: flutter analyze
       
