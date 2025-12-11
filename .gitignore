@@ -63,6 +63,7 @@ app.*.map.json
 /macos/Podfile.lock
 
 # Environment variables (API keys, secrets)
+env
 .env
 .env.local
 .env.*.local

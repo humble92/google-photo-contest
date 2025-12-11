@@ -26,13 +26,13 @@ jobs:
         with:
           pub-cache-path: ~/.pub-cache
 
-      - name: Create .env file for tests
+      - name: Create env file for tests
         run: |
-          echo "SUPABASE_URL=https://example.supabase.co" > .env
-          echo "SUPABASE_ANON_KEY=dummy-key-for-tests" >> .env
-          echo "GOOGLE_WEB_CLIENT_ID=dummy-client-id" >> .env
-          echo "GOOGLE_IOS_CLIENT_ID=dummy-ios-client" >> .env
-          echo "GOOGLE_SERVER_CLIENT_ID=dummy-server-client" >> .env
+          echo "SUPABASE_URL=https://example.supabase.co" > env
+          echo "SUPABASE_ANON_KEY=dummy-key-for-tests" >> env
+          echo "GOOGLE_WEB_CLIENT_ID=dummy-client-id" >> env
+          echo "GOOGLE_IOS_CLIENT_ID=dummy-ios-client" >> env
+          echo "GOOGLE_SERVER_CLIENT_ID=dummy-server-client" >> env
 
       - name: Analyze code
         run: flutter analyze
@@ -56,14 +56,14 @@ jobs:
         with:
           pub-cache-path: ~/.pub-cache
       
-      - name: Create .env file
+      - name: Create env file
         continue-on-error: false
         run: |
-          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" > .env
-          echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
-          echo "GOOGLE_WEB_CLIENT_ID=${{ secrets.GOOGLE_WEB_CLIENT_ID }}" >> .env
-          echo "GOOGLE_IOS_CLIENT_ID=${{ secrets.GOOGLE_IOS_CLIENT_ID }}" >> .env
-          echo "GOOGLE_SERVER_CLIENT_ID=${{ secrets.GOOGLE_SERVER_CLIENT_ID }}" >> .env
+          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" > env
+          echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> env
+          echo "GOOGLE_WEB_CLIENT_ID=${{ secrets.GOOGLE_WEB_CLIENT_ID }}" >> env
+          echo "GOOGLE_IOS_CLIENT_ID=${{ secrets.GOOGLE_IOS_CLIENT_ID }}" >> env
+          echo "GOOGLE_SERVER_CLIENT_ID=${{ secrets.GOOGLE_SERVER_CLIENT_ID }}" >> env
       
       - name: Build Web
         run: flutter build web --release
@@ -105,14 +105,14 @@ jobs:
         with:
           pub-cache-path: ~/.pub-cache
       
-      - name: Create .env file
+      - name: Create env file
         continue-on-error: false
         run: |
-          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" > .env
-          echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
-          echo "GOOGLE_WEB_CLIENT_ID=${{ secrets.GOOGLE_WEB_CLIENT_ID }}" >> .env
-          echo "GOOGLE_IOS_CLIENT_ID=${{ secrets.GOOGLE_IOS_CLIENT_ID }}" >> .env
-          echo "GOOGLE_SERVER_CLIENT_ID=${{ secrets.GOOGLE_SERVER_CLIENT_ID }}" >> .env
+          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" > env
+          echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> env
+          echo "GOOGLE_WEB_CLIENT_ID=${{ secrets.GOOGLE_WEB_CLIENT_ID }}" >> env
+          echo "GOOGLE_IOS_CLIENT_ID=${{ secrets.GOOGLE_IOS_CLIENT_ID }}" >> env
+          echo "GOOGLE_SERVER_CLIENT_ID=${{ secrets.GOOGLE_SERVER_CLIENT_ID }}" >> env
       
       - name: Decode keystore
         env:
@@ -208,14 +208,14 @@ jobs:
           pub-cache-path: ~/.pub-cache
           shell: bash
 
-      - name: Create .env file
+      - name: Create env file
         continue-on-error: false
         run: |
-          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" > .env
-          echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
-          echo "GOOGLE_WEB_CLIENT_ID=${{ secrets.GOOGLE_WEB_CLIENT_ID }}" >> .env
-          echo "GOOGLE_IOS_CLIENT_ID=${{ secrets.GOOGLE_IOS_CLIENT_ID }}" >> .env
-          echo "GOOGLE_SERVER_CLIENT_ID=${{ secrets.GOOGLE_SERVER_CLIENT_ID }}" >> .env
+          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" > env
+          echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> env
+          echo "GOOGLE_WEB_CLIENT_ID=${{ secrets.GOOGLE_WEB_CLIENT_ID }}" >> env
+          echo "GOOGLE_IOS_CLIENT_ID=${{ secrets.GOOGLE_IOS_CLIENT_ID }}" >> env
+          echo "GOOGLE_SERVER_CLIENT_ID=${{ secrets.GOOGLE_SERVER_CLIENT_ID }}" >> env
       
       - name: Install CocoaPods
         run: |
