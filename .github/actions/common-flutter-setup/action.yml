@@ -1,6 +1,6 @@
 # .github/actions/common-flutter-setup/action.yml
 name: Common Flutter Setup
-description: Set up Flutter, cache dependencies and create .env file
+description: Set up Flutter and cache dependencies
 inputs:
   pub-cache-path:
     description: "Path to Flutter Pub cache"
@@ -39,10 +39,3 @@ runs:
     - name: Install dependencies
       run: flutter pub get
       shell: ${{ inputs.shell }}
-
-    - name: Create .env file
-      run: |
-        echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" > .env
-        echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
-        echo "GOOGLE_WEB_CLIENT_ID=${{ secrets.GOOGLE_WEB_CLIENT_ID }}" >> .env
-        echo "GOOGLE_IOS_CLIENT_ID=${{ secrets.GOOGLE_IOS_CLIENT_ID }}" >> .env
