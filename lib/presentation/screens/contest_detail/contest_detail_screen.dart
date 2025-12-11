@@ -89,18 +89,18 @@ class _ContestDetailScreenState extends ConsumerState<ContestDetailScreen> {
   }
 
   Future<void> _fetchMyVotes() async {
-    print('📥 _fetchMyVotes called');
+    debugPrint('📥 _fetchMyVotes called');
     final user = ref.read(currentUserProvider);
-    print('📥 Current user: ${user?.id}');
+    debugPrint('📥 Current user: ${user?.id}');
     if (user != null) {
       final votes = await ref
           .read(voteRepositoryProvider)
           .getMyVotes(user.id, widget.contest.id);
-      print('📥 Received votes: $votes');
+      debugPrint('📥 Received votes: $votes');
       if (mounted) {
         setState(() {
           _votedPhotoIds = votes;
-          print('✅ _votedPhotoIds updated: $_votedPhotoIds');
+          debugPrint('✅ _votedPhotoIds updated: $_votedPhotoIds');
         });
       }
     }
@@ -488,7 +488,7 @@ class _ContestDetailScreenState extends ConsumerState<ContestDetailScreen> {
 
                                       if (isVoted) {
                                         // Remove vote (unvote)
-                                        print(
+                                        debugPrint(
                                           '🔴 Removing vote for photo: ${photo.id}',
                                         );
                                         await ref
@@ -497,7 +497,7 @@ class _ContestDetailScreenState extends ConsumerState<ContestDetailScreen> {
                                               userId: user.id,
                                               photoId: photo.id,
                                             );
-                                        print('✅ Vote removed from DB');
+                                        debugPrint('✅ Vote removed from DB');
 
                                         // Refresh data from database
                                         await _fetchMyVotes();
@@ -516,7 +516,7 @@ class _ContestDetailScreenState extends ConsumerState<ContestDetailScreen> {
                                         }
                                       } else {
                                         // Cast vote
-                                        print(
+                                        debugPrint(
                                           '🟢 Casting vote for photo: ${photo.id}',
                                         );
                                         await ref
@@ -526,7 +526,7 @@ class _ContestDetailScreenState extends ConsumerState<ContestDetailScreen> {
                                               contestId: widget.contest.id,
                                               photoId: photo.id,
                                             );
-                                        print('✅ Vote cast to DB');
+                                        debugPrint('✅ Vote cast to DB');
 
                                         // Refresh data from database
                                         await _fetchMyVotes();
@@ -545,7 +545,7 @@ class _ContestDetailScreenState extends ConsumerState<ContestDetailScreen> {
                                         }
                                       }
                                     } catch (e) {
-                                      print('❌ Vote error: $e');
+                                      debugPrint('❌ Vote error: $e');
                                       if (context.mounted) {
                                         ScaffoldMessenger.of(
                                           context,

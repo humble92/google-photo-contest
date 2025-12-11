@@ -245,7 +245,7 @@ class _ContestListView extends ConsumerWidget {
         if (snapshot.hasError) {
           return Center(child: Text('Error: ${snapshot.error}'));
         }
-        final contests = snapshot.data as List? ?? [];
+        final contests = snapshot.data ?? [];
         if (contests.isEmpty) {
           return Container(
             margin: const EdgeInsets.all(16),
@@ -469,7 +469,7 @@ class _ScatteredPhotosBackground extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 20,
                       spreadRadius: 2,
                     ),

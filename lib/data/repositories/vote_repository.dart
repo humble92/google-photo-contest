@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class VoteRepository {
@@ -40,7 +41,7 @@ class VoteRepository {
   }
 
   Future<Set<String>> getMyVotes(String userId, String contestId) async {
-    print('🔍 Fetching votes for user: $userId, contest: $contestId');
+    debugPrint('🔍 Fetching votes for user: $userId, contest: $contestId');
 
     // Fetch all votes by user for photos in this contest
     final response = await _supabase
@@ -49,19 +50,19 @@ class VoteRepository {
         .eq('user_id', userId)
         .eq('photo.contest_id', contestId);
 
-    print('🔍 getMyVotes response: $response');
-    print('🔍 Response type: ${response.runtimeType}');
-    print('🔍 Response length: ${(response as List).length}');
+    debugPrint('🔍 getMyVotes response: $response');
+    debugPrint('🔍 Response type: ${response.runtimeType}');
+    debugPrint('🔍 Response length: ${(response as List).length}');
 
     final votedPhotoIds = <String>{};
     for (final record in response) {
-      print('🔍 Processing record: $record');
+      debugPrint('🔍 Processing record: $record');
       final photoId = record['photo_id'] as String;
-      print('🔍 Adding photo_id: $photoId');
+      debugPrint('🔍 Adding photo_id: $photoId');
       votedPhotoIds.add(photoId);
     }
 
-    print('✅ Final votedPhotoIds: $votedPhotoIds');
+    debugPrint('✅ Final votedPhotoIds: $votedPhotoIds');
     return votedPhotoIds;
   }
 

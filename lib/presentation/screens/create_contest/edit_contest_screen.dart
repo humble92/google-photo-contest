@@ -143,10 +143,11 @@ class _EditContestScreenState extends ConsumerState<EditContestScreen> {
               maxLines: 3,
             ),
             const SizedBox(height: 16),
+            // Status Dropdown
             DropdownButtonFormField<ContestStatus>(
-              value: _status,
+              initialValue: _status,
               decoration: const InputDecoration(
-                labelText: 'Contest Status',
+                labelText: 'Status',
                 border: OutlineInputBorder(),
               ),
               items: ContestStatus.values.map((status) {

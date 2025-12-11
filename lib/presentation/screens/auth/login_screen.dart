@@ -68,10 +68,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               height: 300,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFFE94560).withOpacity(0.2),
+                color: const Color(0xFFE94560).withValues(alpha: 0.2),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFFE94560).withOpacity(0.2),
+                    color: const Color(0xFFE94560).withValues(alpha: 0.2),
                     blurRadius: 100,
                     spreadRadius: 20,
                   ),
@@ -87,10 +87,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               height: 200,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFF533483).withOpacity(0.2),
+                color: const Color(0xFF533483).withValues(alpha: 0.2),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF533483).withOpacity(0.2),
+                    color: const Color(0xFF533483).withValues(alpha: 0.2),
                     blurRadius: 80,
                     spreadRadius: 20,
                   ),
@@ -108,12 +108,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   width: MediaQuery.of(context).size.width * 0.85,
                   padding: const EdgeInsets.all(32),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
+                    color: Colors.white.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.white.withOpacity(0.2)),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.2),
+                    ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
+                        color: Colors.black.withValues(alpha: 0.2),
                         blurRadius: 20,
                         spreadRadius: 5,
                       ),
@@ -126,7 +128,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.1),
+                          color: Colors.white.withValues(alpha: 0.1),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(
@@ -154,7 +156,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 14,
-                          color: Colors.white.withOpacity(0.7),
+                          color: Colors.white.withValues(alpha: 0.7),
                         ),
                       ),
                       const SizedBox(height: 48),

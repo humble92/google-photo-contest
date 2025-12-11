@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:humble_photo_contest/data/models/contest.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -73,7 +74,7 @@ class ContestRepository {
         await _supabase.storage.from('contest_photos').remove([storagePath]);
       } catch (e) {
         // Continue even if some files fail to delete
-        print('Failed to delete storage file: $e');
+        debugPrint('Failed to delete storage file: $e');
       }
     }
 

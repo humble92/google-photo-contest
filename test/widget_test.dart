@@ -1,7 +1,7 @@
-/// Widget tests for the Photo Contest app.
-///
-/// These tests verify basic app structure and configuration.
-/// Note: Full integration tests requiring Supabase would need additional mocking.
+// Widget tests for the Photo Contest app.
+//
+// These tests verify basic app structure and configuration.
+// Note: Full integration tests requiring Supabase would need additional mocking.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
